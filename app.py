@@ -25,6 +25,11 @@ countdown_text = "Lambaikan kedua tangan\nuntuk mengambil gambar"
 latest_frame = None  # Simpan frame terbaru
 hand_movements = []
 
+
+video_width = 960   # Placeholder, nanti diperbarui dari kamera
+video_height = 540  # Placeholder, nanti diperbarui dari kamera
+
+
 # Load gambar yang sudah ada ke slideshow
 if os.listdir(IMG_DIR):
     captured_images = [os.path.join(IMG_DIR, f) for f in os.listdir(IMG_DIR) if f.endswith(".jpg")]
@@ -35,11 +40,15 @@ def update_slideshow():
         if captured_images:
             for img_path in captured_images:
                 img = Image.open(img_path)
-                img = img.resize((600, 300), Image.Resampling.LANCZOS)
+                
+                # Resize berdasarkan ukuran video
+                img = img.resize((video_width, video_height), Image.Resampling.LANCZOS)
+                
                 img_tk = ImageTk.PhotoImage(img)
                 slideshow_label.config(image=img_tk)
                 slideshow_label.image = img_tk
                 time.sleep(3)
+
 
 # Fungsi untuk mendeteksi pergerakan tangan
 def detect_hand_wave(landmarks):
@@ -87,6 +96,18 @@ def capture_image(frame):
 def video_stream():
     global capture_triggered, countdown_text, latest_frame
     cap = cv2.VideoCapture(0)
+
+    # Dapatkan resolusi asli kamera
+    global video_width, video_height
+    video_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    video_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    # Sesuaikan lebar dengan window (misal 50% dari 1920)
+    target_width = 960
+    target_height = int((video_height / video_width) * target_width)  # Jaga rasio
+
+    video_width, video_height = target_width, target_height  # Update ukuran
+
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -148,34 +169,41 @@ def video_stream():
 
 
 # GUI Setup
-# GUI Setup
 root = tk.Tk()
 root.title("Fun Selfie App")
-root.geometry("600x1900")  # Rasio 6:19
-root.configure(bg="white")  # Mengubah latar belakang menjadi putih
+root.geometry("1920x1080")  # Ukuran Full HD
+root.configure(bg="white")  # Background putih
 
-# Frame untuk slideshow
-slideshow_label = Label(root, bg="white")  # Tambahkan bg putih
-slideshow_label.pack(fill=tk.BOTH, expand=True)
-
-# Load dan tampilkan gambar PNG
-image_path = "logo.png"  # Ganti dengan path gambar PNG
+# Load gambar logo
+image_path = "logo.png"  # Pastikan path sesuai
 original_img = Image.open(image_path)
 
-# Resize agar lebarnya 600px (sesuai window)
-new_width = 600
+# Resize agar lebarnya 300px
+new_width = 800
 aspect_ratio = original_img.height / original_img.width
 new_height = int(new_width * aspect_ratio)
 resized_img = original_img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 img_tk = ImageTk.PhotoImage(resized_img)
 
-# Label untuk gambar PNG (Ditempatkan di tengah)
-image_label = Label(root, image=img_tk, bg="white")  # Tambahkan bg putih
-image_label.pack(fill=tk.BOTH, expand=True)  # Menempatkan gambar di antara slideshow dan video stream
+# Label untuk logo
+logo_label = Label(root, image=img_tk, bg="white")
+logo_label.image = img_tk  # Simpan referensi agar tidak dihapus GC
+logo_label.grid(row=0, column=0, columnspan=2, pady=80)  # Tengah atas
 
-# Frame untuk video stream
-video_label = Label(root, bg="white")  # Tambahkan bg putih
-video_label.pack(fill=tk.BOTH, expand=True)
+# Atur Grid Layout
+root.grid_columnconfigure(0, weight=1)  # Kolom 1 (Slideshow)
+root.grid_columnconfigure(1, weight=1)  # Kolom 2 (Video)
+root.grid_rowconfigure(0, weight=0)  # Logo (Kecil)
+root.grid_rowconfigure(1, weight=1)  # Slideshow & Video (Sama Besar)
+
+# Label Slideshow (Kiri)
+slideshow_label = Label(root, bg="white")
+slideshow_label.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+
+# Label Video Stream (Kanan)
+video_label = Label(root, bg="white")
+video_label.grid(row=1, column=1, padx=10, pady=10, sticky="nsew")
+
 
 # Thread untuk slideshow
 threading.Thread(target=update_slideshow, daemon=True).start()
