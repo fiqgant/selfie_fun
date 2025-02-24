@@ -7,6 +7,8 @@ import threading
 import time
 import os
 import numpy as np
+from collections import deque
+
 
 # Direktori penyimpanan gambar
 IMG_DIR = "captured_images"
@@ -49,26 +51,28 @@ def update_slideshow():
                 slideshow_label.image = img_tk
                 time.sleep(3)
 
-
-# Fungsi untuk mendeteksi pergerakan tangan
 def detect_hand_wave(landmarks):
     global hand_movements
+
     if landmarks:
         wrist_y = landmarks.landmark[mp_hands.HandLandmark.WRIST].y  # Posisi y pergelangan tangan
-        shoulder_y = landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_MCP].y  # Gunakan pangkal jari telunjuk sebagai referensi bahu
+        shoulder_y = landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_MCP].y  # Posisi bahu (pakai pangkal telunjuk)
 
-        # Cek apakah tangan berada di atas kepala (lebih tinggi dari bahu)
-        if wrist_y > shoulder_y:
-            return False  # Tidak di atas kepala
+        # Cek apakah tangan di atas bahu
+        if wrist_y >= shoulder_y:  
+            return False  # Abaikan kalau tangan di bawah/sejajar bahu
 
+        # Simpan pergerakan tangan
         hand_movements.append(wrist_y)
-        if len(hand_movements) > 10:
+        if len(hand_movements) > 5:  # Kurangi jumlah sampel biar lebih responsif
             del hand_movements[0]
-        
-        # Cek jika ada gerakan naik turun yang cukup signifikan (>= 0.1)
-        if len(hand_movements) >= 10 and max(hand_movements) - min(hand_movements) > 0.1:
+
+        # Cek apakah tangan bergerak naik-turun dengan perbedaan kecil (>= 0.05 lebih sensitif)
+        if len(hand_movements) >= 5 and max(hand_movements) - min(hand_movements) > 0.05:
             return True
+
     return False
+
 
 
 # Fungsi untuk menampilkan aba-aba
@@ -88,9 +92,34 @@ def start_countdown():
 
 # Fungsi untuk menangkap gambar
 def capture_image(frame):
+    # Load logo
+    logo_path = "logo.png"  # Pastikan path benar
+    logo = Image.open(logo_path)
+
+    # Resize logo (misal: 20% dari lebar gambar)
+    frame_h, frame_w, _ = frame.shape
+    logo_width = int(frame_w * 0.2)
+    aspect_ratio = logo.height / logo.width
+    logo_height = int(logo_width * aspect_ratio)
+    logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
+
+    # Konversi frame ke format PIL
+    frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+
+    # Posisi logo di bawah tengah
+    x_offset = (frame_w - logo_width) // 2
+    y_offset = frame_h - logo_height - 20  # Beri jarak 20px dari bawah
+
+    # Tempel logo ke frame
+    frame_pil.paste(logo, (x_offset, y_offset), logo)
+
+    # Simpan gambar dengan watermark
     img_path = os.path.join(IMG_DIR, f"selfie_{int(time.time())}.jpg")
-    cv2.imwrite(img_path, frame)
+    frame_pil.save(img_path)
+
+    # Tambahkan ke daftar slideshow
     captured_images.append(img_path)
+
 
 # Fungsi untuk menangani video streaming
 def video_stream():
