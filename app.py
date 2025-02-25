@@ -26,6 +26,8 @@ countdown_active = False
 countdown_text = "Lambaikan kedua tangan\nuntuk mengambil gambar"
 latest_frame = None  # Simpan frame terbaru
 hand_movements = []
+wave_count = 0  # Hitungan jumlah lambaian
+
 
 
 video_width = 960   # Placeholder, nanti diperbarui dari kamera
@@ -52,26 +54,34 @@ def update_slideshow():
                 time.sleep(3)
 
 def detect_hand_wave(landmarks):
-    global hand_movements
+    global hand_movements, wave_count
 
     if landmarks:
-        wrist_y = landmarks.landmark[mp_hands.HandLandmark.WRIST].y  # Posisi y pergelangan tangan
-        shoulder_y = landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_MCP].y  # Posisi bahu (pakai pangkal telunjuk)
+        wrist_y = landmarks.landmark[mp_hands.HandLandmark.WRIST].y
+        nose_y = landmarks.landmark[mp_hands.HandLandmark.NOSE].y  # Posisi hidung sebagai patokan kepala
 
-        # Cek apakah tangan di atas bahu
-        if wrist_y >= shoulder_y:  
-            return False  # Abaikan kalau tangan di bawah/sejajar bahu
+        # Cek apakah tangan di atas kepala
+        if wrist_y >= nose_y:  
+            return False  # Abaikan kalau tangan di bawah kepala
 
         # Simpan pergerakan tangan
         hand_movements.append(wrist_y)
-        if len(hand_movements) > 5:  # Kurangi jumlah sampel biar lebih responsif
+        if len(hand_movements) > 10:  # Sesuaikan panjang antrian agar lebih responsif
             del hand_movements[0]
 
-        # Cek apakah tangan bergerak naik-turun dengan perbedaan kecil (>= 0.05 lebih sensitif)
-        if len(hand_movements) >= 5 and max(hand_movements) - min(hand_movements) > 0.05:
+        # Cek jumlah perubahan arah (naik-turun)
+        if len(hand_movements) >= 2:
+            if (hand_movements[-1] > hand_movements[-2]) and (len(hand_movements) > 2 and hand_movements[-2] < hand_movements[-3]):
+                wave_count += 1  # Tambah hitungan saat ada perubahan arah naik-turun
+
+        # Jika sudah melambai 3 kali, reset dan kembalikan True
+        if wave_count >= 3:
+            wave_count = 0
+            hand_movements.clear()
             return True
 
     return False
+
 
 
 
