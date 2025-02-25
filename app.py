@@ -136,6 +136,8 @@ def capture_image(frame):
 def video_stream():
     global capture_triggered, countdown_text, latest_frame
     cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FPS, 60)
+    cv2.setUseOptimized(True)
 
     # Dapatkan resolusi asli kamera
     global video_width, video_height
