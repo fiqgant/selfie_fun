@@ -17,7 +17,6 @@ os.makedirs(IMG_DIR, exist_ok=True)
 # MediaPipe Hands
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
-mp_pose = mp.solutions.pose  # Tambahkan pose
 hands = mp_hands.Hands(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
 # Variabel
@@ -27,8 +26,6 @@ countdown_active = False
 countdown_text = "Lambaikan kedua tangan\nuntuk mengambil gambar"
 latest_frame = None  # Simpan frame terbaru
 hand_movements = []
-wave_count = 0  # Hitungan jumlah lambaian
-
 
 
 video_width = 960   # Placeholder, nanti diperbarui dari kamera
@@ -54,32 +51,24 @@ def update_slideshow():
                 slideshow_label.image = img_tk
                 time.sleep(3)
 
-def detect_hand_wave(hand_landmarks, pose_landmarks=None):
+def detect_hand_wave(landmarks):
+    global hand_movements
 
-    global hand_movements, wave_count
+    if landmarks:
+        wrist_y = landmarks.landmark[mp_hands.HandLandmark.WRIST].y  # Posisi y pergelangan tangan
+        shoulder_y = landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_MCP].y  # Posisi bahu (pakai pangkal telunjuk)
 
-    if hand_landmarks and pose_landmarks:
-        wrist_y = hand_landmarks.landmark[mp_hands.HandLandmark.WRIST].y
-        nose_y = pose_landmarks.landmark[mp_pose.PoseLandmark.NOSE].y  # Gunakan NOSE dari pose
-
-        # Cek apakah tangan di atas kepala
-        if wrist_y >= nose_y:  
-            return False  # Abaikan kalau tangan di bawah kepala
+        # Cek apakah tangan di atas bahu
+        if wrist_y >= shoulder_y:  
+            return False  # Abaikan kalau tangan di bawah/sejajar bahu
 
         # Simpan pergerakan tangan
         hand_movements.append(wrist_y)
-        if len(hand_movements) > 10:  
+        if len(hand_movements) > 5:  # Kurangi jumlah sampel biar lebih responsif
             del hand_movements[0]
 
-        # Cek perubahan arah untuk mendeteksi lambaian
-        if len(hand_movements) >= 2:
-            if (hand_movements[-1] > hand_movements[-2]) and (len(hand_movements) > 2 and hand_movements[-2] < hand_movements[-3]):
-                wave_count += 1  
-
-        # Jika sudah melambai 3 kali, reset dan return True
-        if wave_count >= 3:
-            wave_count = 0
-            hand_movements.clear()
+        # Cek apakah tangan bergerak naik-turun dengan perbedaan kecil (>= 0.05 lebih sensitif)
+        if len(hand_movements) >= 5 and max(hand_movements) - min(hand_movements) > 0.05:
             return True
 
     return False
@@ -136,8 +125,6 @@ def capture_image(frame):
 def video_stream():
     global capture_triggered, countdown_text, latest_frame
     cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FPS, 60)
-    cv2.setUseOptimized(True)
 
     # Dapatkan resolusi asli kamera
     global video_width, video_height
