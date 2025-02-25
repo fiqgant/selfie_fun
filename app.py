@@ -17,6 +17,7 @@ os.makedirs(IMG_DIR, exist_ok=True)
 # MediaPipe Hands
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
+mp_pose = mp.solutions.pose  # Tambahkan pose
 hands = mp_hands.Hands(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
 # Variabel
@@ -53,12 +54,13 @@ def update_slideshow():
                 slideshow_label.image = img_tk
                 time.sleep(3)
 
-def detect_hand_wave(landmarks):
+def detect_hand_wave(hand_landmarks, pose_landmarks=None):
+
     global hand_movements, wave_count
 
-    if landmarks:
-        wrist_y = landmarks.landmark[mp_hands.HandLandmark.WRIST].y
-        nose_y = landmarks.landmark[mp_hands.HandLandmark.NOSE].y  # Posisi hidung sebagai patokan kepala
+    if hand_landmarks and pose_landmarks:
+        wrist_y = hand_landmarks.landmark[mp_hands.HandLandmark.WRIST].y
+        nose_y = pose_landmarks.landmark[mp_pose.PoseLandmark.NOSE].y  # Gunakan NOSE dari pose
 
         # Cek apakah tangan di atas kepala
         if wrist_y >= nose_y:  
@@ -66,22 +68,21 @@ def detect_hand_wave(landmarks):
 
         # Simpan pergerakan tangan
         hand_movements.append(wrist_y)
-        if len(hand_movements) > 10:  # Sesuaikan panjang antrian agar lebih responsif
+        if len(hand_movements) > 10:  
             del hand_movements[0]
 
-        # Cek jumlah perubahan arah (naik-turun)
+        # Cek perubahan arah untuk mendeteksi lambaian
         if len(hand_movements) >= 2:
             if (hand_movements[-1] > hand_movements[-2]) and (len(hand_movements) > 2 and hand_movements[-2] < hand_movements[-3]):
-                wave_count += 1  # Tambah hitungan saat ada perubahan arah naik-turun
+                wave_count += 1  
 
-        # Jika sudah melambai 3 kali, reset dan kembalikan True
+        # Jika sudah melambai 3 kali, reset dan return True
         if wave_count >= 3:
             wave_count = 0
             hand_movements.clear()
             return True
 
     return False
-
 
 
 
